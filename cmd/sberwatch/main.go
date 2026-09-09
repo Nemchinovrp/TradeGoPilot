@@ -87,7 +87,7 @@ func run() (retErr error) {
 	if err != nil {
 		return err
 	}
-	hub := dashboard.New(cfg.Environment)
+	hub := dashboard.New(cfg.Environment, *interval)
 	var uiErrors <-chan error
 	if *uiAddress != "" {
 		ui, err := dashboard.Start(*uiAddress, hub)

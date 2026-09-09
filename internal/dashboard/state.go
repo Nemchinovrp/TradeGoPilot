@@ -43,19 +43,20 @@ type Stats struct {
 	Unavailable int `json:"unavailable"`
 }
 type State struct {
-	ServerTime  time.Time         `json:"server_time"`
-	Started     time.Time         `json:"started"`
-	Environment string            `json:"environment"`
-	Status      string            `json:"status"`
-	Message     string            `json:"message"`
-	Book        *Book             `json:"book"`
-	Signal      *orderflow.Signal `json:"signal"`
-	Points      []Point           `json:"points"`
-	Trades      []Trade           `json:"trades"`
-	Predictions []Prediction      `json:"predictions"`
-	Stats       [3]Stats          `json:"stats"`
-	BookCount   int               `json:"book_count"`
-	TradeCount  int               `json:"trade_count"`
+	ServerTime            time.Time         `json:"server_time"`
+	Started               time.Time         `json:"started"`
+	Environment           string            `json:"environment"`
+	SignalIntervalSeconds float64           `json:"signal_interval_seconds"`
+	Status                string            `json:"status"`
+	Message               string            `json:"message"`
+	Book                  *Book             `json:"book"`
+	Signal                *orderflow.Signal `json:"signal"`
+	Points                []Point           `json:"points"`
+	Trades                []Trade           `json:"trades"`
+	Predictions           []Prediction      `json:"predictions"`
+	Stats                 [3]Stats          `json:"stats"`
+	BookCount             int               `json:"book_count"`
+	TradeCount            int               `json:"trade_count"`
 }
 
 type Hub struct {
@@ -63,8 +64,8 @@ type Hub struct {
 	state State
 }
 
-func New(environment string) *Hub {
-	return &Hub{state: State{Started: time.Now(), Environment: environment, Status: "connecting", Message: "Подключение к данным SBER…", Stats: [3]Stats{{Horizon: 10}, {Horizon: 30}, {Horizon: 60}}}}
+func New(environment string, interval time.Duration) *Hub {
+	return &Hub{state: State{Started: time.Now(), Environment: environment, SignalIntervalSeconds: interval.Seconds(), Status: "connecting", Message: "Подключение к данным SBER…", Stats: [3]Stats{{Horizon: 10}, {Horizon: 30}, {Horizon: 60}}}}
 }
 
 func (h *Hub) Connection(status, message string) {
@@ -82,7 +83,7 @@ func (h *Hub) Book(b *pb.OrderBook, now time.Time) {
 	defer h.mu.Unlock()
 	h.state.BookCount++
 	valid := orderflow.ValidBook(b, now)
-	if h.state.Book != nil && b.GetTime() != nil && !b.Time.AsTime().After(h.state.Book.Time) {
+	if valid && h.state.Book != nil && b.GetTime() != nil && !b.Time.AsTime().After(h.state.Book.Time) {
 		return
 	}
 	x := &Book{Valid: valid}

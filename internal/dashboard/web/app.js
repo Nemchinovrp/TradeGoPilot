@@ -78,7 +78,7 @@ function factor(name, value, available) {
 
 function renderSignal() {
   const s = state?.signal;
-  const available = freshBook() && s && serverNow() - Date.parse(s.time) <= 30000;
+  const available = freshBook() && s && serverNow() - Date.parse(s.time) <= (state.signal_interval_seconds + 3) * 1000;
   const ready = available && s.ready;
   const direction = ready ? s.direction : "Неопределённо";
   const score = available ? s.score * 100 : 0;
@@ -103,9 +103,7 @@ function renderBook() {
   text("best-ask", valid ? `${money.format(asks[0].price)} ₽` : "—");
   text("spread", valid ? `${money.format(b.spread)} ₽ · ${decimals.format(b.spread / b.mid * 10000)} б.п.` : "—");
   document.title = valid ? `${money.format(b.mid)} ₽ · SBER · TradeGoPilot` : "SBER · TradeGoPilot";
-  const points = state.points ?? [];
-  const first = points[0];
-  text("price-change", valid && first ? `${signed(b.mid - first.mid)} ₽ за показанную историю · mid` : "Середина спреда · ожидание котировок");
+  if (!valid) text("price-change", "Середина спреда · ожидание котировок");
   let bidTotal = 0, askTotal = 0;
   const maxVolume = Math.max(1, ...bids.map((l) => Number(l.quantity)), ...asks.map((l) => Number(l.quantity)));
   bookRows.forEach((cells, i) => {
@@ -135,7 +133,7 @@ function renderChart() {
   const points = (state?.points ?? []).filter((p) => Date.parse(p.time) >= from);
   const chart = $("chart"); chart.replaceChildren();
   $("chart-empty").hidden = points.length > 0;
-  if (!points.length) { chart.setAttribute("aria-label", "За выбранный период нет котировок"); return; }
+  if (!points.length) { chart.setAttribute("aria-label", "За выбранный период нет котировок"); text("chart-count", "История текущего запуска"); return; }
   const left = 12, right = 704, top = 22, bottom = 246;
   const values = points.map((p) => p.mid);
   const lo = Math.min(...values), hi = Math.max(...values), pad = Math.max((hi - lo) * .15, .015);
@@ -159,6 +157,7 @@ function renderChart() {
   });
   chart.append(svg("path", { d: path, fill: "none", stroke: "#42d8aa", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round", "vector-effect": "non-scaling-stroke" }));
   const last = points[points.length - 1];
+  text("price-change", `${signed(last.mid - points[0].mid)} ₽ за ${range / 60} мин · mid`);
   chart.append(svg("circle", { cx: x(Date.parse(last.time)), cy: y(last.mid), r: 3.5, fill: "#42d8aa" }));
   chart.setAttribute("aria-label", `Цена SBER за ${range / 60} минут: от ${money.format(lo)} до ${money.format(hi)} рублей; последняя ${money.format(last.mid)} рубля.`);
   text("chart-count", `${points.length} отсчётов · разрывы = нет данных`);
