@@ -68,12 +68,16 @@ func New(c Config) (*Client, error) {
 	if err := c.validate(); err != nil {
 		return nil, err
 	}
-	endpoint := "sandbox-invest-public-api.tinkoff.ru:443"
+	endpoint := "sandbox-invest-public-api.tbank.ru:443"
 	if c.Environment == "production" {
-		endpoint = "invest-public-api.tinkoff.ru:443"
+		endpoint = "invest-public-api.tbank.ru:443"
+	}
+	roots, err := investRootCAs()
+	if err != nil {
+		return nil, err
 	}
 	conn, err := grpc.NewClient(endpoint,
-		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})),
+		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12, RootCAs: roots})),
 		grpc.WithPerRPCCredentials(auth{c.Token, c.AppName}),
 	)
 	if err != nil {

@@ -32,6 +32,13 @@ go run ./cmd/tradegopilot
 Для этой команды достаточно доступа только на чтение.
 Токен храните в локальном .env, который исключён из Git.
 
+Клиент использует адреса `sandbox-invest-public-api.tbank.ru:443` и
+`invest-public-api.tbank.ru:443`. Для проверки TLS к системным корневым
+сертификатам добавлен встроенный Russian Trusted Root CA из официального
+источника Госуслуг. Устанавливать его в систему не требуется; проверка
+сертификата и имени сервера включена. Источник и отпечаток:
+[internal/invest/certs/README.md](internal/invest/certs/README.md).
+
 ## Структура
 
 - internal/invest — конфигурация и переиспользуемый клиент.
@@ -49,4 +56,4 @@ go vet ./...
 go build ./...
 ```
 
-Документация: https://tinkoff.github.io/investAPI/grpc/
+Документация: https://developer.tbank.ru/invest/intro/developer/network
