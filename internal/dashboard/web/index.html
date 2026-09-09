@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Наблюдение за стаканом, сделками и сигналами SBER в реальном времени.">
+  <title>SBER · TradeGoPilot</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="TradeGoPilot, главная"><span class="brand-icon" aria-hidden="true">↗</span>TradeGoPilot<span class="brand-label">/ наблюдение</span></a>
+    <div class="connection"><span class="environment" id="environment">Подключение</span><span class="status-dot" id="status-dot"></span><span id="connection-status" role="status">Соединяемся…</span></div>
+  </header>
+  <main>
+    <section class="instrument" aria-labelledby="instrument-title">
+      <div class="instrument-name"><div class="ticker-icon" aria-hidden="true">С</div><div><h1 id="instrument-title">SBER <span>Сбербанк</span></h1><p>Акции · TQBR · только наблюдение</p></div></div>
+      <div class="instrument-price"><strong id="mid">—</strong><span class="currency">₽</span><div id="price-change">Середина спреда · ожидание котировок</div></div>
+    </section>
+    <div class="notice" id="notice" role="status">Подключение к потоку. Первые данные появятся автоматически.</div>
+
+    <div class="overview">
+      <div><span class="label">Лучшая покупка</span><strong id="best-bid" class="positive">—</strong></div>
+      <div><span class="label">Лучшая продажа</span><strong id="best-ask" class="negative">—</strong></div>
+      <div><span class="label">Спред</span><strong id="spread">—</strong></div>
+      <div><span class="label">Данные стакана</span><strong id="book-age">Ожидание</strong></div>
+    </div>
+
+    <div class="main-grid">
+      <section class="panel chart-panel" aria-labelledby="chart-title">
+        <div class="panel-head"><div><h2 id="chart-title">Цена в реальном времени</h2><p>Середина между покупкой и продажей, ₽</p></div><div class="segments" aria-label="Период графика"><button type="button" data-range="60" aria-pressed="false">1 мин</button><button type="button" data-range="300" aria-pressed="true">5 мин</button><button type="button" data-range="900" aria-pressed="false">15 мин</button></div></div>
+        <div class="chart-wrap"><svg id="chart" viewBox="0 0 800 280" role="img" aria-label="График ожидает данные"></svg><div id="chart-empty" class="chart-empty">График появится с первым обновлением стакана</div></div>
+        <div class="chart-footer"><span><i class="line-key"></i>Цена SBER</span><span id="chart-count">История текущего запуска</span></div>
+      </section>
+
+      <section class="panel signal-panel" aria-labelledby="signal-title">
+        <div class="panel-head"><h2 id="signal-title">Давление на цену</h2><span class="eyebrow">Окно ≈10 с</span></div>
+        <div class="signal-main"><strong id="signal-direction">Ожидание</strong><span id="signal-score">—<small> / 100</small></span></div>
+        <div class="pressure-track"><span id="pressure-marker"></span></div><div class="pressure-labels"><span>Продавцы</span><span>Покупатели</span></div>
+        <p id="signal-reason" class="signal-reason">Нужны свежий стакан и сделки.</p>
+        <div class="factors">
+          <div class="factor"><span>Объём в стакане</span><div class="factor-track"><i id="factor-book-bar"></i></div><b id="factor-book">—</b></div>
+          <div class="factor"><span>Поток заявок</span><div class="factor-track"><i id="factor-flow-bar"></i></div><b id="factor-flow">—</b></div>
+          <div class="factor"><span>Направление сделок</span><div class="factor-track"><i id="factor-trades-bar"></i></div><b id="factor-trades">—</b></div>
+        </div>
+        <p class="fine-print">Оценка давления, не вероятность изменения цены.</p>
+      </section>
+    </div>
+
+    <div class="market-grid">
+      <section class="panel" aria-labelledby="book-title">
+        <div class="panel-head"><h2 id="book-title">Стакан заявок</h2><span class="eyebrow">10 уровней · лоты</span></div>
+        <div class="book-content" id="book-content">
+          <table class="book-table"><caption class="sr-only">Заявки на покупку и продажу, лучшие цены сверху</caption><thead><tr><th scope="col">Объём</th><th scope="col" class="positive">Покупка, ₽</th><th scope="col" class="negative">Продажа, ₽</th><th scope="col">Объём</th></tr></thead><tbody id="book-rows"></tbody></table>
+        </div>
+        <div class="book-balance"><div><span id="bid-total" class="positive">—</span><span id="ask-total" class="negative">—</span></div><div class="balance-track"><i id="balance-bid"></i></div><p>Суммарный объём показанных уровней</p></div>
+      </section>
+
+      <section class="panel tape-panel" aria-labelledby="tape-title">
+        <div class="panel-head"><h2 id="tape-title">Лента сделок</h2><span id="trade-count" class="eyebrow">0 за сеанс</span></div>
+        <div class="tape-scroll"><table><caption class="sr-only">Последние 40 сделок, новые сверху</caption><thead><tr><th scope="col">Время</th><th scope="col">Цена, ₽</th><th scope="col">Лоты</th><th scope="col">Направление</th></tr></thead><tbody id="trade-rows"><tr><td colspan="4" class="empty-cell">Ожидание сделок SBER</td></tr></tbody></table></div>
+        <div class="panel-foot">Обезличенные сделки · новые сверху</div>
+      </section>
+    </div>
+
+    <section class="panel predictions-panel" aria-labelledby="predictions-title">
+      <div class="panel-head"><div><h2 id="predictions-title">Проверка сигналов</h2><p>Как изменилась цена через 10, 30 и 60 секунд</p></div><span class="eyebrow">Текущий сеанс</span></div>
+      <div class="accuracy-strip" id="accuracy-strip"></div>
+      <div class="predictions-scroll"><table><caption class="sr-only">Последние 80 направленных сигналов и фактическое изменение цены в базисных пунктах</caption><thead><tr><th scope="col">Время</th><th scope="col">Сигнал</th><th scope="col">Оценка</th><th scope="col">Цена, ₽</th><th scope="col">10 секунд</th><th scope="col">30 секунд</th><th scope="col">60 секунд</th></tr></thead><tbody id="prediction-rows"><tr><td colspan="7" class="empty-cell">Здесь появятся направленные сигналы и результаты их проверки.</td></tr></tbody></table></div>
+      <div class="panel-foot">Изменение в базисных пунктах: 1 б.п. = 0,01%. Считаем движение цены, без комиссий и исполнения заявок.</div>
+    </section>
+    <footer><span>TradeGoPilot <span class="footer-dot">·</span> SBER / TQBR</span><span id="session-info">Данные доступны, пока запущено приложение</span></footer>
+  </main>
+</body>
+</html>

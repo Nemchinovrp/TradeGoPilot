@@ -27,9 +27,13 @@ go.work.sum
 # env file
 .env
 
+# Local market observations
+/data/
+
 # Editor/IDE
 # .idea/
 # .vscode/
 *.iml
 vcs.xml
 modules.xml
+data/
