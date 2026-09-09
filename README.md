@@ -144,8 +144,13 @@ go build ./...
 Остановка  kill -INT 92127
 
 Запуск
+
 cd /Users/roman/GolandProjects/TradeGoPilot
+
 set -a
+
 source .env
+
 set +a
+
 env -u GOROOT go run ./cmd/sberwatch
