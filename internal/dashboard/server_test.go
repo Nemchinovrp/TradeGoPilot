@@ -16,14 +16,14 @@ func TestLocalHTTPRoutes(t *testing.T) {
 		path, host, origin string
 		code               int
 	}{
-		{"/", "127.0.0.1:8080", "", 200},
-		{"/app.js", "localhost:8080", "", 200},
-		{"/style.css", "127.0.0.1:8080", "", 200},
-		{"/api/state", "127.0.0.1:8080", "http://127.0.0.1:8080", 200},
-		{"/api/state", "evil.example:8080", "", 403},
-		{"/api/state", "127.0.0.1:8080", "https://evil.example", 403},
-		{"/.env", "127.0.0.1:8080", "", 404},
-		{"/api/orders", "127.0.0.1:8080", "", 404},
+		{"/", "127.0.0.1:5498", "", 200},
+		{"/app.js", "localhost:5498", "", 200},
+		{"/style.css", "127.0.0.1:5498", "", 200},
+		{"/api/state", "127.0.0.1:5498", "http://127.0.0.1:5498", 200},
+		{"/api/state", "evil.example:5498", "", 403},
+		{"/api/state", "127.0.0.1:5498", "https://evil.example", 403},
+		{"/.env", "127.0.0.1:5498", "", 404},
+		{"/api/orders", "127.0.0.1:5498", "", 404},
 	} {
 		t.Run(tc.path+tc.host+tc.origin, func(t *testing.T) {
 			r := httptest.NewRequest(http.MethodGet, "http://"+tc.host+tc.path, nil)
@@ -51,7 +51,7 @@ func TestSSEInitialSnapshotAndCancellation(t *testing.T) {
 	h := New("sandbox", 5*time.Second)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	r := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8080/api/events", nil).WithContext(ctx)
+	r := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:5498/api/events", nil).WithContext(ctx)
 	w := &streamRecorder{httptest.NewRecorder(), cancel}
 	Handler(h).ServeHTTP(w, r)
 	if w.Code != 200 || w.Header().Get("Content-Type") != "text/event-stream" {
@@ -71,7 +71,7 @@ func TestSSEInitialSnapshotAndCancellation(t *testing.T) {
 }
 
 func TestRejectPublicBind(t *testing.T) {
-	for _, addr := range []string{"0.0.0.0:8080", ":8080", "192.168.1.2:8080", "[::]:8080"} {
+	for _, addr := range []string{"0.0.0.0:5498", ":5498", "192.168.1.2:5498", "[::]:5498"} {
 		if s, err := Start(addr, New("sandbox", time.Second)); err == nil {
 			s.Close()
 			t.Fatalf("public bind accepted: %s", addr)

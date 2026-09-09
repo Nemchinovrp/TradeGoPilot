@@ -9,6 +9,7 @@ const minutes = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-d
 let state = null;
 let received = 0;
 let transport = false;
+let connectionFailed = false;
 let range = 300;
 
 function text(id, value) { $(id).textContent = value; }
@@ -41,6 +42,10 @@ function renderConnection() {
   const fresh = freshBook();
   const linked = transport && performance.now() - received < 4000;
   let label = "Соединяемся…", message = "Подключение к потоку. Первые данные появятся автоматически.", dot = "";
+  if (!state && connectionFailed) {
+    label = "Нет связи с приложением"; dot = "offline";
+    message = "Не удалось подключиться к приложению. Убедитесь, что наблюдатель запущен. Повторяем подключение автоматически.";
+  }
   if (state) {
     text("environment", state.environment === "sandbox" ? "Песочница" : "Production");
     if (!linked) {
@@ -216,9 +221,9 @@ document.querySelectorAll("[data-range]").forEach((button) => button.addEventLis
 const source = new EventSource("/api/events");
 source.addEventListener("state", (event) => {
   try { state = JSON.parse(event.data); } catch { return; }
-  received = performance.now(); transport = true;
+  received = performance.now(); transport = true; connectionFailed = false;
   renderBook(); renderChart(); renderTrades(); renderPredictions(); renderConnection();
   text("session-info", `Сеанс с ${clock.format(Date.parse(state.started))} · ${number.format(state.book_count)} стаканов`);
 });
-source.onerror = () => { transport = false; renderConnection(); };
+source.onerror = () => { transport = false; connectionFailed = true; renderConnection(); };
 setInterval(() => { renderConnection(); if (state) renderPredictions(); }, 1000);

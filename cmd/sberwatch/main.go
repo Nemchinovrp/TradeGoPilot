@@ -78,7 +78,7 @@ func run() (retErr error) {
 	duration := flag.Duration("duration", 0, "время наблюдения, например 2m; 0 — до Ctrl+C")
 	interval := flag.Duration("interval", 5*time.Second, "интервал сигналов, минимум 1s")
 	logPath := flag.String("log", "", "новый JSONL-файл; по умолчанию data/sber-<время>.jsonl")
-	uiAddress := flag.String("ui", "127.0.0.1:8080", "локальный адрес веб-интерфейса; пустая строка отключает UI")
+	uiAddress := flag.String("ui", "127.0.0.1:5498", "локальный адрес веб-интерфейса; пустая строка отключает UI")
 	flag.Parse()
 	if *duration < 0 || *interval < time.Second || flag.NArg() != 0 {
 		return errors.New("duration должен быть >=0, interval >=1s; позиционные аргументы не поддерживаются")

@@ -37,3 +37,4 @@ go.work.sum
 vcs.xml
 modules.xml
 data/
+.idea

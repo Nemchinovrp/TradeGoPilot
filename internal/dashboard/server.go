@@ -28,7 +28,7 @@ type Server struct {
 func Start(address string, hub *Hub) (*Server, error) {
 	host, _, err := net.SplitHostPort(address)
 	if err != nil || net.ParseIP(host) == nil || !net.ParseIP(host).IsLoopback() {
-		return nil, errors.New("UI: укажите локальный адрес, например 127.0.0.1:8080")
+		return nil, errors.New("UI: укажите локальный адрес, например 127.0.0.1:5498")
 	}
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
