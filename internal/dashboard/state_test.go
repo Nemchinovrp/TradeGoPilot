@@ -39,8 +39,8 @@ func TestSnapshotsAndConnection(t *testing.T) {
 	}
 	h.Connection("reconnecting", "retry")
 	s = h.Snapshot(now)
-	if s.Book != nil || s.Signal != nil || len(s.Predictions) != 1 {
-		t.Fatal("disconnect must clear live data and retain history")
+	if s.Book == nil || s.Book.Valid || s.Book.Mid != 300.005 || s.Book.Bids[0].Quantity != 50 || s.Signal != nil || len(s.Predictions) != 1 {
+		t.Fatal("disconnect must retain the last quote and mark it stale")
 	}
 }
 

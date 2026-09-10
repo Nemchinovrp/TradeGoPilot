@@ -31,11 +31,11 @@
       <section class="panel chart-panel" aria-labelledby="chart-title">
         <div class="panel-head"><div><h2 id="chart-title">Цена в реальном времени</h2><p>Середина между покупкой и продажей, ₽</p></div><div class="segments" aria-label="Период графика"><button type="button" data-range="60" aria-pressed="false">1 мин</button><button type="button" data-range="300" aria-pressed="true">5 мин</button><button type="button" data-range="900" aria-pressed="false">15 мин</button></div></div>
         <div class="chart-wrap"><svg id="chart" viewBox="0 0 800 280" role="img" aria-label="График ожидает данные"></svg><div id="chart-empty" class="chart-empty">График появится с первым обновлением стакана</div></div>
-        <div class="chart-footer"><span><i class="line-key"></i>Цена SBER</span><span id="chart-count">История текущего запуска</span></div>
+        <div class="chart-footer"><span><i class="line-key"></i>Цена SBER</span><span id="chart-count">Последние котировки сеанса</span></div>
       </section>
 
       <section class="panel signal-panel" aria-labelledby="signal-title">
-        <div class="panel-head"><h2 id="signal-title">Давление на цену</h2><span class="eyebrow">Окно ≈10 с</span></div>
+        <div class="panel-head"><h2 id="signal-title">Давление на цену</h2><span class="eyebrow" id="signal-state">Ожидание данных</span></div>
         <div class="signal-main"><strong id="signal-direction">Ожидание</strong><span id="signal-score">—<small> / 100</small></span></div>
         <div class="pressure-track"><span id="pressure-marker"></span></div><div class="pressure-labels"><span>Продавцы</span><span>Покупатели</span></div>
         <p id="signal-reason" class="signal-reason">Нужны свежий стакан и сделки.</p>

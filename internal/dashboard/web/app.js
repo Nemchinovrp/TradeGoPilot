@@ -11,8 +11,11 @@ let received = 0;
 let transport = false;
 let connectionFailed = false;
 let range = 300;
+let lastSignal = null;
+let chartKey = "";
+let tradesKey = "";
 
-function text(id, value) { $(id).textContent = value; }
+function text(id, value) { if ($(id).textContent !== String(value)) $(id).textContent = value; }
 function signed(value, digits = 2) { return `${value > 0 ? "+" : ""}${digits === 0 ? Math.round(value) : decimals.format(value)}`; }
 function tone(value) { return value > 0 ? "positive" : value < 0 ? "negative" : "muted"; }
 function element(tag, value, className = "") {
@@ -62,11 +65,11 @@ function renderConnection() {
     }
   }
   text("connection-status", label); $("status-dot").className = `status-dot ${dot}`;
-  $("notice").hidden = !message; text("notice", message);
+  text("notice", message || "Данные обновляются автоматически. Все данные сеанса хранятся только в памяти.");
   $("book-content").classList.toggle("stale", !fresh);
   if (state?.book?.time) {
     const age = Math.max(0, (serverNow() - Date.parse(state.book.time)) / 1000);
-    text("book-age", fresh ? `${decimals.format(age)} с назад` : "Нет свежих данных");
+    text("book-age", `${number.format(age)} с назад${fresh ? "" : " · пауза"}`);
   } else { text("book-age", "Ожидание"); }
   renderSignal();
 }
@@ -82,27 +85,30 @@ function factor(name, value, available) {
 }
 
 function renderSignal() {
-  const s = state?.signal;
+  const current = state?.signal;
+  if (current && current.mid > 0) lastSignal = current;
+  const s = lastSignal;
   const available = freshBook() && s && serverNow() - Date.parse(s.time) <= (state.signal_interval_seconds + 3) * 1000;
-  const ready = available && s.ready;
+  const ready = s && s.ready;
   const direction = ready ? s.direction : "Неопределённо";
-  const score = available ? s.score * 100 : 0;
+  const score = s ? s.score * 100 : 0;
   const color = ready && direction === "вверх" ? "positive" : ready && direction === "вниз" ? "negative" : "muted";
   text("signal-direction", direction.charAt(0).toUpperCase() + direction.slice(1));
   $("signal-direction").className = color;
   const scoreNode = $("signal-score");
-  scoreNode.replaceChildren(document.createTextNode(available ? signed(score, 0) : "—"), element("small", " / 100"));
+  scoreNode.replaceChildren(document.createTextNode(s ? signed(score, 0) : "—"), element("small", " / 100"));
   $("pressure-marker").style.left = `${50 + score / 2}%`;
-  text("signal-reason", available ? s.reason : "Ожидаем свежие данные и следующий расчёт сигнала.");
-  factor("book", s?.book_imbalance ?? 0, available);
-  factor("flow", s?.order_flow ?? 0, available);
-  factor("trades", s?.trade_imbalance ?? 0, available);
+  text("signal-reason", available ? s.reason : s ? `Расчёт приостановлен. Последняя оценка в ${clock.format(Date.parse(s.time))}.` : "Ожидаем первый расчёт по свежим данным.");
+  text("signal-state", available ? "Текущая оценка" : s ? "Последняя оценка · пауза" : "Ожидание данных");
+  factor("book", s?.book_imbalance ?? 0, Boolean(s));
+  factor("flow", s?.order_flow ?? 0, Boolean(s));
+  factor("trades", s?.trade_imbalance ?? 0, Boolean(s));
 }
 
 function renderBook() {
   const b = state.book;
   const bids = b?.bids ?? [], asks = b?.asks ?? [];
-  const valid = b?.valid && bids.length && asks.length;
+  const valid = bids.length && asks.length;
   text("mid", valid ? money.format(b.mid) : "—");
   text("best-bid", valid ? `${money.format(bids[0].price)} ₽` : "—");
   text("best-ask", valid ? `${money.format(asks[0].price)} ₽` : "—");
@@ -134,11 +140,17 @@ function svg(tag, attributes, value) {
 }
 
 function renderChart() {
-  const now = serverNow(), from = now - range * 1000;
+  const all = state?.points ?? [];
+  const key = JSON.stringify([range, all]);
+  if (key === chartKey) return;
+  chartKey = key;
+  // Anchor to the latest quote: a quiet market must not erase the chart.
+  const now = all.length ? Date.parse(all[all.length - 1].time) : serverNow();
+  const from = now - range * 1000;
   const points = (state?.points ?? []).filter((p) => Date.parse(p.time) >= from);
   const chart = $("chart"); chart.replaceChildren();
   $("chart-empty").hidden = points.length > 0;
-  if (!points.length) { chart.setAttribute("aria-label", "За выбранный период нет котировок"); text("chart-count", "История текущего запуска"); return; }
+  if (!points.length) { chart.setAttribute("aria-label", "За выбранный период нет котировок"); text("chart-count", "Последние котировки сеанса"); return; }
   const left = 12, right = 704, top = 22, bottom = 246;
   const values = points.map((p) => p.mid);
   const lo = Math.min(...values), hi = Math.max(...values), pad = Math.max((hi - lo) * .15, .015);
@@ -157,6 +169,9 @@ function renderChart() {
   let path = "", previous = 0;
   points.forEach((p) => {
     const at = Date.parse(p.time);
+    if (!previous || at - previous > 3000) {
+      chart.append(svg("circle", { cx: x(at), cy: y(p.mid), r: 2, fill: "#42d8aa" }));
+    }
     path += `${previous && at - previous <= 3000 ? "L" : "M"}${x(at).toFixed(2)},${y(p.mid).toFixed(2)} `;
     previous = at;
   });
@@ -168,10 +183,18 @@ function renderChart() {
   text("chart-count", `${points.length} отсчётов · разрывы = нет данных`);
 }
 
+function emptyRows(id, columns, message) {
+  const row = element("tr"), cell = element("td", message, "empty-cell");
+  cell.colSpan = columns; row.append(cell); $(id).replaceChildren(row);
+}
+
 function renderTrades() {
   text("trade-count", `${number.format(state.trade_count)} за сеанс`);
   const trades = state.trades ?? [];
-  if (!trades.length) return;
+  const key = JSON.stringify(trades);
+  if (key === tradesKey) return;
+  tradesKey = key;
+  if (!trades.length) { emptyRows("trade-rows", 4, "Ожидание сделок SBER"); return; }
   const fragment = document.createDocumentFragment();
   trades.slice().reverse().forEach((t) => {
     const row = element("tr");
@@ -189,7 +212,7 @@ function renderPredictions() {
     return item;
   }));
   const predictions = state.predictions ?? [];
-  if (!predictions.length) return;
+  if (!predictions.length) { emptyRows("prediction-rows", 7, "Здесь появятся направленные сигналы и результаты их проверки."); return; }
   const fragment = document.createDocumentFragment();
   predictions.slice().reverse().forEach((p) => {
     const row = element("tr"), s = p.signal;
@@ -218,12 +241,40 @@ document.querySelectorAll("[data-range]").forEach((button) => button.addEventLis
   renderChart();
 }));
 
-const source = new EventSource("/api/events");
-source.addEventListener("state", (event) => {
-  try { state = JSON.parse(event.data); } catch { return; }
-  received = performance.now(); transport = true; connectionFailed = false;
-  renderBook(); renderChart(); renderTrades(); renderPredictions(); renderConnection();
-  text("session-info", `Сеанс с ${clock.format(Date.parse(state.started))} · ${number.format(state.book_count)} стаканов`);
+let source = null;
+let lastAttempt = 0;
+function connect() {
+  source?.close();
+  lastAttempt = performance.now();
+  const stream = new EventSource("/api/events");
+  source = stream;
+  stream.addEventListener("state", (event) => {
+    if (source !== stream) return;
+    let next;
+    try { next = JSON.parse(event.data); } catch { return; }
+    if (!next || !Number.isFinite(Date.parse(next.server_time)) || !Array.isArray(next.stats)) return;
+    if (state && state.started !== next.started) { lastSignal = null; chartKey = ""; tradesKey = ""; }
+    state = next;
+    received = performance.now(); transport = true; connectionFailed = false;
+    renderBook(); renderChart(); renderTrades(); renderPredictions(); renderConnection();
+    text("session-info", `Сеанс с ${clock.format(Date.parse(state.started))} · ${number.format(state.book_count)} стаканов`);
+  });
+  stream.onerror = () => {
+    if (source !== stream) return;
+    transport = false; connectionFailed = true; renderConnection();
+  };
+}
+connect();
+setInterval(() => {
+  // EventSource retries explicit errors itself; also recover a silently hung stream.
+  if (performance.now() - Math.max(received, lastAttempt) > 10000) {
+    transport = false; connectionFailed = true; connect();
+  }
+  renderConnection();
+  if (state) { renderChart(); renderPredictions(); }
+}, 1000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && performance.now() - received > 4000) {
+    transport = false; connect(); renderConnection();
+  }
 });
-source.onerror = () => { transport = false; connectionFailed = true; renderConnection(); };
-setInterval(() => { renderConnection(); if (state) renderPredictions(); }, 1000);

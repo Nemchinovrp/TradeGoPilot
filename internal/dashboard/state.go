@@ -74,7 +74,11 @@ func (h *Hub) Connection(status, message string) {
 	h.state.Status, h.state.Message = status, message
 	if status != "connected" {
 		h.state.Signal = nil
-		h.state.Book = nil
+		if h.state.Book != nil {
+			b := *h.state.Book
+			b.Valid = false
+			h.state.Book = &b
+		}
 	}
 }
 
@@ -84,6 +88,13 @@ func (h *Hub) Book(b *pb.OrderBook, now time.Time) {
 	h.state.BookCount++
 	valid := orderflow.ValidBook(b, now)
 	if valid && h.state.Book != nil && b.GetTime() != nil && !b.Time.AsTime().After(h.state.Book.Time) {
+		return
+	}
+	// Keep the last usable quote visible while explicitly marking it stale.
+	if !valid && h.state.Book != nil {
+		b := *h.state.Book
+		b.Valid = false
+		h.state.Book = &b
 		return
 	}
 	x := &Book{Valid: valid}

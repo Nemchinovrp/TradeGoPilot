@@ -2,20 +2,17 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
 	pb "github.com/tinkoff/invest-api-go-sdk/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/encoding/protojson"
 	"tradegopilot/internal/dashboard"
 	"tradegopilot/internal/invest"
 	"tradegopilot/internal/orderflow"
@@ -77,7 +74,6 @@ func receive(ctx context.Context, client *invest.Client, uid string, events chan
 func run() (retErr error) {
 	duration := flag.Duration("duration", 0, "время наблюдения, например 2m; 0 — до Ctrl+C")
 	interval := flag.Duration("interval", 5*time.Second, "интервал сигналов, минимум 1s")
-	logPath := flag.String("log", "", "новый JSONL-файл; по умолчанию data/sber-<время>.jsonl")
 	uiAddress := flag.String("ui", "127.0.0.1:5498", "локальный адрес веб-интерфейса; пустая строка отключает UI")
 	flag.Parse()
 	if *duration < 0 || *interval < time.Second || flag.NArg() != 0 {
@@ -115,43 +111,17 @@ func run() (retErr error) {
 		return err
 	}
 	runID := time.Now().UTC().Format("20060102T150405.000000000Z")
-	if *logPath == "" {
-		*logPath = filepath.Join("data", "sber-"+runID+".jsonl")
-	}
-	if err := os.MkdirAll(filepath.Dir(*logPath), 0700); err != nil {
-		return err
-	}
-	f, err := os.OpenFile(*logPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-	if err != nil {
-		return err
-	}
-	defer func() { retErr = errors.Join(retErr, f.Close()) }()
-	encoder := json.NewEncoder(f)
-	write := func(kind string, data any) error {
-		return encoder.Encode(struct {
-			Type       string    `json:"type"`
-			ReceivedAt time.Time `json:"received_at"`
-			Data       any       `json:"data"`
-		}{kind, time.Now().UTC(), data})
-	}
-	if err := write("session", map[string]any{"run_id": runID, "ticker": "SBER", "class_code": "TQBR", "uid": instrument.Uid, "environment": cfg.Environment, "depth": 10, "interval_seconds": interval.Seconds(), "model": "orderflow-v1", "window_seconds": 10, "max_age_seconds": 3, "weights": []float64{.45, .30, .25}, "threshold": .25, "max_spread_bps": 10}); err != nil {
-		return err
-	}
-	fmt.Printf("SBER (%s), %s. Наблюдение без заявок. Журнал: %s\n", instrument.Name, cfg.Environment, *logPath)
+	fmt.Printf("SBER (%s), %s. Наблюдение без заявок. Данные только в памяти.\n", instrument.Name, cfg.Environment)
 	fmt.Println("Ожидание подтверждения подписок на стакан и сделки…")
 	var analyzer orderflow.Analyzer
 	var evaluator orderflow.Evaluator
-	writeResults := func(results []orderflow.Evaluation) error {
+	publishResults := func(results []orderflow.Evaluation) {
 		for _, r := range results {
-			if err := write("evaluation", r); err != nil {
-				return err
-			}
 			hub.Evaluation(r)
 		}
-		return nil
 	}
 	defer func() {
-		retErr = errors.Join(retErr, writeResults(evaluator.Reset(time.Now(), "наблюдение завершено")))
+		publishResults(evaluator.Reset(time.Now(), "наблюдение завершено"))
 	}()
 	streamCtx, cancel := context.WithCancel(ctx)
 	events := make(chan event, 256)
@@ -185,12 +155,7 @@ func run() (retErr error) {
 			now := time.Now()
 			if e.err != nil {
 				hub.Connection("reconnecting", "Связь с API потеряна. Переподключаемся…")
-				if err := write("disconnect", e.err.Error()); err != nil {
-					return err
-				}
-				if err := writeResults(evaluator.Reset(now, "разрыв потока")); err != nil {
-					return err
-				}
+				publishResults(evaluator.Reset(now, "разрыв потока"))
 				analyzer = orderflow.Analyzer{}
 				connected = false
 				if e.fatal {
@@ -207,41 +172,20 @@ func run() (retErr error) {
 			r := e.response
 			if b := r.GetOrderbook(); b != nil && b.InstrumentUid == instrument.Uid {
 				hub.Book(b, now)
-				raw, err := protojson.Marshal(b)
-				if err != nil {
-					return err
-				}
-				if err := write("book", json.RawMessage(raw)); err != nil {
-					return err
-				}
 				if analyzer.Book(b, now) {
-					if err := writeResults(evaluator.Observe(now, b.Time.AsTime(), orderflow.Mid(b))); err != nil {
-						return err
-					}
+					publishResults(evaluator.Observe(now, b.Time.AsTime(), orderflow.Mid(b)))
 				}
 			}
 			if t := r.GetTrade(); t != nil && t.InstrumentUid == instrument.Uid {
 				hub.Trade(t)
-				raw, err := protojson.Marshal(t)
-				if err != nil {
-					return err
-				}
-				if err := write("trade", json.RawMessage(raw)); err != nil {
-					return err
-				}
 				analyzer.Trade(t, now)
 			}
 		case <-ticker.C:
 			now := time.Now()
-			if err := writeResults(evaluator.Observe(now, time.Time{}, 0)); err != nil {
-				return err
-			}
+			publishResults(evaluator.Observe(now, time.Time{}, 0))
 			s := analyzer.Signal(now)
 			sequence++
 			s.ID = fmt.Sprintf("%s-%d", runID, sequence)
-			if err := write("signal", s); err != nil {
-				return err
-			}
 			evaluator.Add(s)
 			hub.Signal(s)
 			fmt.Printf("%s SBER: %s | оценка %+.0f/100 | mid %.2f ₽ | %s\n", now.Format("15:04:05"), s.Direction, s.Score*100, s.Mid, s.Reason)
