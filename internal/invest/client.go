@@ -8,10 +8,8 @@ import (
 	"strings"
 	"time"
 
-	pb "github.com/tinkoff/invest-api-go-sdk/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/metadata"
 )
 
 type Config struct {
@@ -86,23 +84,3 @@ func New(c Config) (*Client, error) {
 	return &Client{conn: conn, config: c}, nil
 }
 func (c *Client) Close() error { return c.conn.Close() }
-
-// Accounts reads existing accounts without creating sandbox accounts.
-// Returned metadata includes headers and trailers even on RPC errors.
-func (c *Client) Accounts(ctx context.Context) (*pb.GetAccountsResponse, metadata.MD, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.config.Timeout)
-	defer cancel()
-	var header, trailer metadata.MD
-	opts := []grpc.CallOption{grpc.Header(&header), grpc.Trailer(&trailer)}
-	var response *pb.GetAccountsResponse
-	var err error
-	if c.config.Environment == "sandbox" {
-		response, err = pb.NewSandboxServiceClient(c.conn).GetSandboxAccounts(ctx, &pb.GetAccountsRequest{}, opts...)
-	} else {
-		response, err = pb.NewUsersServiceClient(c.conn).GetAccounts(ctx, &pb.GetAccountsRequest{}, opts...)
-	}
-	if err != nil {
-		err = fmt.Errorf("get accounts: %w", err)
-	}
-	return response, metadata.Join(header, trailer), err
-}

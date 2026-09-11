@@ -1,6 +1,6 @@
 # TradeGoPilot
 
-Go-клиент Invest API через gRPC: получение счетов и наблюдатель стакана SBER.
+Локальный веб-интерфейс для наблюдения за стаканом, сделками и сигналами SBER через Invest API.
 
 ## Запуск
 
@@ -12,14 +12,13 @@ cp .env.example .env
 set -a
 source .env
 set +a
-go run ./cmd/tradegopilot
+go run ./cmd/sberwatch
 ```
 
 Программа читает окружение; файл .env автоматически не загружается.
 Если локальный GOROOT указывает на другую версию Go, запускайте
-`env -u GOROOT go run ./cmd/tradegopilot` (аналогично для проверок).
-Ответ выводится JSON в stdout, tracking-id и ошибки — в stderr.
-Пустой список счетов песочницы допустим: программа счета не создаёт.
+`env -u GOROOT go run ./cmd/sberwatch` (аналогично для проверок).
+После запуска откройте http://127.0.0.1:5498. Остановка — Ctrl+C.
 
 | Переменная | По умолчанию | Назначение |
 | --- | --- | --- |
@@ -28,8 +27,8 @@ go run ./cmd/tradegopilot
 | INVEST_APP_NAME | roman.TradeGoPilot | Заголовок x-app-name |
 | INVEST_TIMEOUT | 10s | Положительный таймаут RPC, включая соединение |
 
-Для реальных счетов задайте INVEST_ENV=production и соответствующий токен.
-Для этой команды достаточно доступа только на чтение.
+Для production-контура задайте INVEST_ENV=production и соответствующий токен.
+Приложению достаточно доступа к рыночным данным; список счетов не запрашивается.
 Токен храните в локальном .env, который исключён из Git.
 
 Клиент использует адреса `sandbox-invest-public-api.tbank.ru:443` и
@@ -42,7 +41,6 @@ go run ./cmd/tradegopilot
 ## Структура
 
 - internal/invest — конфигурация и переиспользуемый клиент.
-- cmd/tradegopilot — получение счетов; Ctrl+C отменяет запрос.
 - cmd/sberwatch — наблюдение за стаканом и сделками SBER/TQBR.
 - internal/orderflow — расчёт давления и проверка сигналов через 10/30/60 секунд.
 - internal/dashboard — встроенный локальный веб-интерфейс и поток обновлений для браузера.
@@ -135,22 +133,7 @@ https://developer.tbank.ru/invest/services/quotes/marketdata
 go test ./...
 go vet ./...
 go build ./...
+node --test internal/dashboard/app.test.cjs
 ```
 
 Документация: https://developer.tbank.ru/invest/intro/developer/network
-
-Поиск lsof -nP -iTCP:5498 -sTCP:LISTEN
-
-Остановка  kill -INT 92127
-
-Запуск
-
-cd /Users/roman/GolandProjects/TradeGoPilot
-
-set -a
-
-source .env
-
-set +a
-
-env -u GOROOT go run ./cmd/sberwatch
